@@ -1,0 +1,44 @@
+# --- Entornos Virtuales Python ---
+venv/
+.venv/
+env/
+ENV/
+
+# --- Caché y Compilados Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# --- Archivos Temporales y Estado Local del Parqueadero ---
+*.tmp
+*.log
+parking_db.json
+
+# --- Pesos Locales de OCR / Visión Artificial ---
+.EasyOCR/
+*.pth
+*.onnx
+
+# --- Variables de Entorno y Credenciales ---
+.env
+.env.local
+
+# --- Compilados de Arduino / ESP32 ---
+build/
+*.bin
+*.elf
+*.map
+
+# --- IDEs y Editores ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Archivos de Sistema Operativo (Windows / macOS) ---
+.DS_Store
+Thumbs.db
+desktop.ini

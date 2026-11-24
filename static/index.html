@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Parqueadero | Validador ESP32</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="badge-hw">ESP32 + OCR</span>
+        <h1>ParkControl</h1>
+        <p>Arquitectura de Computadores</p>
+      </div>
+      <nav class="nav-menu">
+        <button class="nav-btn active" data-tab="monitor">Monitor en Vivo</button>
+        <button class="nav-btn" data-tab="vehiculos">Placas y Estados</button>
+        <button class="nav-btn" data-tab="caja">Caja y Liquidación</button>
+        <button class="nav-btn" data-tab="historial">Bitácora de Eventos</button>
+        <button class="nav-btn" data-tab="config">Configuración</button>
+      </nav>
+      <div class="hw-status-box">
+        <div class="status-row">
+          <span>ESP32 Serial:</span>
+          <strong id="status-serial" class="pill off">Desconectado</strong>
+        </div>
+        <div class="status-row">
+          <span>Cámara IP:</span>
+          <strong id="status-cam" class="pill off">Sin señal</strong>
+        </div>
+        <small id="status-msg">Iniciando...</small>
+        <button id="btn-reconectar" class="btn-secondary btn-sm">Reconectar COM</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="kpis">
+          <div class="kpi-card">
+            <span>Registrados</span>
+            <strong id="kpi-total">0</strong>
+          </div>
+          <div class="kpi-card green">
+            <span>Pago Validado (A)</span>
+            <strong id="kpi-al-dia">0</strong>
+          </div>
+          <div class="kpi-card yellow">
+            <span>Pendiente Pago (P)</span>
+            <strong id="kpi-pendientes">0</strong>
+          </div>
+          <div class="kpi-card blue">
+            <span>Recaudo Total</span>
+            <strong id="kpi-recaudo">$0</strong>
+          </div>
+        </div>
+        <button id="btn-abrir-manual" class="btn-danger">Abrir Barrera Manual</button>
+      </header>
+
+      <section id="tab-monitor" class="tab-panel active">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Cámara IP y Detección OCR</h2>
+            <div class="video-wrapper">
+              <img src="/api/video_feed" alt="Transmisión en vivo cámara IP">
+            </div>
+            <form id="form-simulador" class="inline-form">
+              <input type="text" id="sim-placa" placeholder="Simular lectura (ej. ABC123)" maxlength="6" required>
+              <button type="submit" class="btn-primary">Enviar a ESP32</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h2>Estado Físico del Validador</h2>
+            <div class="lcd-display">
+              <div class="lcd-line" id="lcd-line-1">PARQUEADERO</div>
+              <div class="lcd-line" id="lcd-line-2">ESPERANDO PLACA</div>
+            </div>
+
+            <div class="leds-panel">
+              <div class="led-item">
+                <span id="led-b1" class="led white on"></span>
+                <label>Blanco 1 (GPIO 25)</label>
+              </div>
+              <div class="led-item">
+                <span id="led-b2" class="led white on"></span>
+                <label>Blanco 2 (GPIO 26)</label>
+              </div>
+              <div class="led-item">
+                <span id="led-am" class="led yellow"></span>
+                <label>Amarillo (GPIO 27)</label>
+              </div>
+              <div class="led-item">
+                <span id="led-ve" class="led green"></span>
+                <label>Verde (GPIO 32)</label>
+              </div>
+            </div>
+
+            <div class="servo-info">
+              <span>Talanquera (GPIO 13):</span>
+              <strong id="servo-estado">CERRADA (0°)</strong>
+            </div>
+
+            <h3>Últimos Eventos en Tiempo Real</h3>
+            <ul id="mini-logs" class="event-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-vehiculos" class="tab-panel">
+        <div class="card">
+          <h2>Registrar Ingreso o Actualizar Vehículo</h2>
+          <form id="form-vehiculo" class="form-grid">
+            <input type="text" id="v-placa" placeholder="Placa (ABC123)" maxlength="6" required>
+            <input type="text" id="v-propietario" placeholder="Nombre del propietario" required>
+            <select id="v-tipo">
+              <option value="CARRO">Carro</option>
+              <option value="MOTO">Moto</option>
+            </select>
+            <select id="v-estado">
+              <option value="P">P - Pendiente por pagar (Ingreso)</option>
+              <option value="A">A - Pago validado / Mensualidad</option>
+              <option value="N">N - Sin registro de ingreso</option>
+            </select>
+            <button type="submit" class="btn-primary">Guardar en JSON</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="table-header">
+            <h2>Vehículos Sincronizados (base_placas.json)</h2>
+            <input type="text" id="filtro-placa" placeholder="Filtrar por placa o dueño...">
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Placa</th>
+                <th>Propietario</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Tiempo</th>
+                <th>Acciones Rápidas</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-vehiculos"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-caja" class="tab-panel">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Liquidación y Cobro de Salida</h2>
+            <form id="form-cotizar" class="inline-form">
+              <input type="text" id="caja-placa" placeholder="Ingrese placa a cobrar" maxlength="6" required>
+              <button type="submit" class="btn-primary">Calcular Tarifa</button>
+            </form>
+            <div id="detalle-cobro" class="receipt-box hidden">
+              <p><strong>Placa:</strong> <span id="rec-placa"></span></p>
+              <p><strong>Tipo:</strong> <span id="rec-tipo"></span></p>
+              <p><strong>Tiempo transcurrido:</strong> <span id="rec-minutos"></span> min</p>
+              <p><strong>Minutos cobrables:</strong> <span id="rec-cobrables"></span> min</p>
+              <h3 class="total-pay">Total a Pagar: <span id="rec-monto">$0</span></h3>
+              <label class="checkbox-row">
+                <input type="checkbox" id="rec-abrir" checked>
+                Enviar comando A:PLACA y abrir talanquera al cobrar
+              </label>
+              <button id="btn-confirmar-pago" class="btn-success">Validar Pago y Habilitar Salida</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>Vehículos Pendientes por Pagar (P)</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Placa</th>
+                  <th>Tipo</th>
+                  <th>Minutos</th>
+                  <th>Saldo</th>
+                  <th>Cobrar</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-pendientes"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-historial" class="tab-panel">
+        <div class="card">
+          <h2>Bitácora Cronológica de Accesos, Rechazos y Pagos</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha y Hora</th>
+                <th>Placa</th>
+                <th>Estado</th>
+                <th>Origen</th>
+                <th>Detalle</th>
+                <th>TX Serial</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-logs"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="tab-config" class="tab-panel">
+        <div class="card">
+          <h2>Parámetros de Hardware y Tarifas</h2>
+          <form id="form-config" class="form-grid-2">
+            <div>
+              <label>Tarifa por minuto Carro ($ COP)</label>
+              <input type="number" id="cfg-tarifa-carro" step="10" required>
+            </div>
+            <div>
+              <label>Tarifa por minuto Moto ($ COP)</label>
+              <input type="number" id="cfg-tarifa-moto" step="10" required>
+            </div>
+            <div>
+              <label>Minutos de gracia sin cobro</label>
+              <input type="number" id="cfg-gracia" required>
+            </div>
+            <div>
+              <label>Puerto Serial ESP32 (ej. COM7 o /dev/ttyUSB0)</label>
+              <input type="text" id="cfg-puerto" required>
+            </div>
+            <div>
+              <label>URL Cámara IP o Índice Webcam (ej. 0 o http://192.168.1.50:8080/video)</label>
+              <input type="text" id="cfg-camara" required>
+            </div>
+            <div>
+              <label>Cooldown OCR entre lecturas (segundos)</label>
+              <input type="number" id="cfg-cooldown" min="1" max="60" required>
+            </div>
+            <button type="submit" class="btn-primary">Guardar Configuración</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
